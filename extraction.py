@@ -28,61 +28,62 @@ def levenshtein_distance(a, b):
     return current_row[n]
 
 
-
 def get_hse_teachers():
 	# сделаем GET-запрос к страничке преподавателей Вышки с фильтром ФКН
 	url = 'https://www.hse.ru/org/persons/?ltr=%D0%92%D1%81%D0%B5;udept=120026365'
 	r = requests.get(url)
 
-	# как-нибудь обработаем полученный текст, выделяя основные компоненты
-	s1 = '<div class="posts persons">' + r.text.split('<div class="posts persons">', 1)[1]
-	s1 = s1.split('</div></div></div></div><div class="footer">', 1)[0]
+	# обработаем полученный текст, выделяя основные компоненты
+	main_components = '<div class="posts persons">' + r.text.split('<div class="posts persons">', 1)[1]
+	main_components = main_components.split('</div></div></div></div><div class="footer">', 1)[0]
 
-	arr = []
-	for idx, s in enumerate(s1.split('</div>\n\n<div class="post person">')):
+	all_items = []
+	for idx, s in enumerate(main_components.split('</div>\n\n<div class="post person">')):
 	    splitted = s.split('<div class="l-extra small">')
 	    if len(splitted) > 1:
-	        s4, s5 = splitted[1].split('</div>', 1)
+	        first_part, second_part = splitted[1].split('</div>', 1)
 	    else:
-	        s4 = splitted[0].split('</div>', 1)
-	        s4 = s5
+	        first_part = splitted[0].split('</div>', 1)
+	        second_part = first_part
 	    d = {}
 	    # номера телефонов
-	    d["phones"] = list(map(lambda s: s[6:][:-7], re.findall(r'<span>.*</span>', s4)))
-		# адреса электронной почты
-	    emails = list(map(lambda s: s[25:][:-6], re.findall(r'<a class="link" data-at=\'.*\'></a>', s4)))
+	    d["phones"] = list(map(lambda s: s[6:][:-7], re.findall(r'<span>.*</span>', first_part)))
+	    # адреса электронной почты
+	    emails = list(map(lambda s: s[25:][:-6], re.findall(r'<a class="link" data-at=\'.*\'></a>', first_part)))
 	    d["emails"] = list(map(lambda r: ''.join(list(map(lambda s: s.replace("-at-", "@"), eval(r)))), emails))
-		# ссылка на страницу преподавателя
-	    d["page_id"] = re.search(r'(/org/persons/\d*|/staff/\w*)', s5).group(1)
-		# его имя
-	    d["name"] = re.search(r'title="([\s\w.,\-\(\)]*)"', s5).group(1)
-		# должность
-	    d["post"] = list(map(lambda x: x.rstrip(":"), re.findall(r'<span>\s*([^<\n\t]*)\s*<', s5)))
-		# подразделение
-	    d["depart"] = ' / '.join(re.findall(r'<a[^>]*>([^<]*)</a>|</span>', s5.split('class="tag"', 1)[0])).replace('/  /', ';').rstrip("/ ") # "</span>"
+	    # ссылка на страницу преподавателя
+	    d["page_id"] = re.search(r'(/org/persons/\d*|/staff/\w*)', second_part).group(1)
+	    # его имя
+	    d["name"] = re.search(r'title="([\s\w.,\-\(\)]*)"', second_part).group(1)
+	    # должность
+	    d["post"] = list(map(lambda x: x.rstrip(":"), re.findall(r'<span>\s*([^<\n\t]*)\s*<', second_part)))
+	    # подразделение
+	    d["depart"] = ' / '.join(re.findall(r'<a[^>]*>([^<]*)</a>|</span>', 
+						second_part.split('class="tag"', 1)[0])
+				    ).replace('/  /', ';').rstrip("/ ")
 	    # интересы
 	    try:
-	        d["interests"] = ', '.join(re.findall(r'<a[^>]*>([^<]*)</a>', s5.split('class="tag"', 1)[1]))
+	        d["interests"] = ', '.join(re.findall(r'<a[^>]*>([^<]*)</a>', second_part.split('class="tag"', 1)[1]))
 	    except:
 	        d["interests"] = ''
 	    # обработка какого-то странного бага, из-за которого запись разрывается на две
-	    if len(arr) > 0 and arr[-1]["name"] == d["name"] and arr[-1]["page_id"] == d["page_id"] and \
-	            arr[-1]["post"] == d["post"] and arr[-1]["depart"] == d["depart"]:
-	        if d["emails"] and d["phones"] and (not arr[-1]["phones"] and not arr[-1]["phones"]):
-	            arr[-1]["emails"] = d["emails"]
-	            arr[-1]["phones"] = d["phones"]
-	        elif arr[-1]["emails"] and arr[-1]["phones"] and (not d["phones"] and not d["phones"]):
+	    if len(all_items) > 0 and all_items[-1]["name"] == d["name"] and all_items[-1]["page_id"] == d["page_id"] and \
+	            all_items[-1]["post"] == d["post"] and all_items[-1]["depart"] == d["depart"]:
+	        if d["emails"] and d["phones"] and (not all_items[-1]["phones"] and not all_items[-1]["phones"]):
+	            all_items[-1]["emails"] = d["emails"]
+	            all_items[-1]["phones"] = d["phones"]
+	        elif all_items[-1]["emails"] and all_items[-1]["phones"] and (not d["phones"] and not d["phones"]):
 	            continue
 	    else:
-	        arr.append(d)
-	    #print(idx, d["name"])
-	return arr
+	        all_items.append(d)
+	    # print(idx, d["name"])
+	return all_items
 
 def get_msu_teachers():
-	arr = []
-	for i in range(ord('а'), ord('а')+32):
-		# на сайте ВМК страницы с разбиением по буквам
-	    url = 'https://cs.msu.ru/persons/all/'+chr(i) 
+	all_items = []
+	for i in range(ord('а'), ord('а') + 32):
+	    # на сайте ВМК страницы с разбиением по буквам
+	    url = f'https://cs.msu.ru/persons/all/{chr(i)}'
 	    r = requests.get(url)
 	    if not r.ok:
 	        continue
@@ -105,16 +106,16 @@ def get_msu_teachers():
 	                d['post'] = ''.join([s for idx, s in enumerate(re.split(r'<|>', ret1.group(1))) if idx % 2 == 0])
 	            except:
 	                d['post'] = ''
-	        arr.append(d)
-	return arr
+	        all_items.append(d)
+	return all_items
 
 
 if __name__ == "__main__":
 
 	parser = argparse.ArgumentParser(description="You can point output files names")
-	parser.add_argument("-hse", type=str, default="hse.json", dest='hse_path',
+	parser.add_argument("-hse", type=str, default="hse.json", dest="hse_path",
 	                    help="path to msu teacher's list")
-	parser.add_argument("-msu", type=str, default="msu.json", dest='msu_path',
+	parser.add_argument("-msu", type=str, default="msu.json", dest="msu_path",
 	                    help="path to msu teacher's list")
 	
 	args = parser.parse_args()
@@ -123,18 +124,17 @@ if __name__ == "__main__":
 	msu_teachers = get_msu_teachers()
 
 	with codecs.open(args.hse_path, 'w', encoding='utf-8') as f:
-		f.write(json.dumps(hse_teachers, ensure_ascii=False))
+	    f.write(json.dumps(hse_teachers, ensure_ascii=False))
 
 	with codecs.open(args.msu_path, 'w', encoding='utf-8') as f:
-		f.write(json.dumps(msu_teachers, ensure_ascii=False))
-
+	    f.write(json.dumps(msu_teachers, ensure_ascii=False))
 
 	# так сколько же пересечений?
 	df1, df2 = pd.DataFrame(hse_teachers), pd.DataFrame(msu_teachers)
 	# df2['name'] = df2['name'].apply(lambda x: x.strip())
 	joined = df1.join(df2.set_index('name'), on='name', how='inner', lsuffix='_hse', rsuffix='_msu')
 	print("Общих преподавателей с ФКН и ВМК", len(joined))
-	print('\n'.join(list(joined['name'])))
+	print("\n".join(list(joined['name'])))
 	# На самом деле на ФКН два Черновых Александра Владимировича и один из них - не наш:(
 
 	# А что, если была где-то небольшая опечатка?
@@ -145,7 +145,7 @@ if __name__ == "__main__":
 	            leven3.append('\t\t'.join((name["name"], possib['name'])))
 	
 	print("\nС расстоянием Левенштейна < 3", len(leven3))
-	print('\n'.join(leven3))
+	print("\n".join(leven3))
 
 	print("\nПомимо Грушо-Глушко добавились три новых абсолютно одинаковых на первый взгляд человека")
 
